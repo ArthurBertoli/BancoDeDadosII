@@ -1,0 +1,9 @@
+[{
+  "_id": {
+    "$oid": "67318a963682473d4afc5279"
+  },
+  "nro_registro": 1,
+  "nome": "Carlos Silva",
+  "endereco": "Rua A, 123",
+  "telefone": "1234-5678"
+}]

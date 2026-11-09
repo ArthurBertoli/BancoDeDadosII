@@ -1,0 +1,165 @@
+CREATE TABLE Musicos(
+    nro_registro SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    endereco VARCHAR(200),
+    telefone VARCHAR(15)
+);
+
+CREATE TABLE Bandas(
+    id_banda SERIAL PRIMARY KEY,
+    nome_banda VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Instrumentos(
+    codigo SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Discos(
+    id_disco SERIAL PRIMARY KEY,
+    titulo VARCHAR(100) NOT NULL,
+    data DATE NOT NULL,
+    formato VARCHAR(10)
+);
+
+CREATE TABLE Musicas(
+    id_musica SERIAL PRIMARY KEY,
+    titulo VARCHAR(100) NOT NULL,
+    autores VARCHAR(255)
+);
+
+CREATE TABLE Produtores(
+    id_produtor SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Estudios(
+    codigo_estudio SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL
+);
+
+CREATE OR REPLACE FUNCTION insere_musico_toca_instrumento()
+RETURNS TRIGGER AS $$
+BEGIN
+    --Checa se o instrumento já existe
+    IF NOT EXISTS (SELECT 1 FROM Instrumentos WHERE codigo = NEW.codigo_instrumento) THEN
+        RAISE EXCEPTION 'Instrumento com código % não existe', NEW.codigo_instrumento;
+    END IF;
+    
+    --Exemplo: Realiza ações com base no relacionamento.
+    RAISE NOTICE 'Músico com registro % agora toca o instrumento %', NEW.nro_registro, NEW.codigo_instrumento;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_insere_musico_toca_instrumento
+AFTER INSERT ON Musicos
+FOR EACH ROW
+EXECUTE FUNCTION insere_musico_toca_instrumento();
+
+CREATE OR REPLACE FUNCTION associa_disco_produtor()
+RETURNS TRIGGER AS $$
+BEGIN
+    --Verifica se o produtor existe
+    IF NOT EXISTS (SELECT 1 FROM Produtores WHERE id_produtor = NEW.id_produtor) THEN
+        RAISE EXCEPTION 'Produtor com ID % não existe', NEW.id_produtor;
+    END IF;
+
+    --Verifica se o disco existe
+    IF NOT EXISTS (SELECT 1 FROM Discos WHERE id_disco = NEW.id_disco) THEN
+        RAISE EXCEPTION 'Disco com ID % não existe', NEW.id_disco;
+    END IF;
+
+    RAISE NOTICE 'Disco com ID % agora está associado ao produtor com ID %', NEW.id_disco, NEW.id_produtor;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_associa_disco_produtor
+AFTER INSERT ON Discos
+FOR EACH ROW
+EXECUTE FUNCTION associa_disco_produtor();
+
+CREATE TABLE Banda_Tem_Disco(
+    id_banda INT REFERENCES Bandas(id_banda),
+    id_disco INT REFERENCES Discos(id_disco),
+    PRIMARY KEY (id_banda, id_disco)
+);
+
+CREATE OR REPLACE FUNCTION associa_musica_com_disco()
+RETURNS TRIGGER AS $$
+BEGIN
+    --Verifica se a música existe
+    IF NOT EXISTS (SELECT 1 FROM Musicas WHERE id_musica = NEW.id_musica) THEN
+        RAISE EXCEPTION 'Música com ID % não existe', NEW.id_musica;
+    END IF;
+
+    --Verifica se o disco existe
+    IF NOT EXISTS (SELECT 1 FROM Discos WHERE id_disco = NEW.id_disco) THEN
+        RAISE EXCEPTION 'Disco com ID % não existe', NEW.id_disco;
+    END IF;
+
+    RAISE NOTICE 'Música com ID % foi associada ao disco com ID %', NEW.id_musica, NEW.id_disco;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_associa_musica_com_disco
+AFTER INSERT ON Musicas
+FOR EACH ROW
+EXECUTE FUNCTION associa_musica_com_disco();
+
+
+CREATE OR REPLACE FUNCTION associa_musico_com_banda()
+RETURNS TRIGGER AS $$
+BEGIN
+    --Verifica se o músico existe
+    IF NOT EXISTS (SELECT 1 FROM Musicos WHERE nro_registro = NEW.nro_registro) THEN
+        RAISE EXCEPTION 'Músico com número de registro % não existe', NEW.nro_registro;
+    END IF;
+
+    --Verifica se a banda existe
+    IF NOT EXISTS (SELECT 1 FROM Bandas WHERE id_banda = NEW.id_banda) THEN
+        RAISE EXCEPTION 'Banda com ID % não existe', NEW.id_banda;
+    END IF;
+
+    RAISE NOTICE 'Músico com número de registro % foi associado à banda com ID %', NEW.nro_registro, NEW.id_banda;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_associa_musico_com_banda
+AFTER INSERT ON Musicos
+FOR EACH ROW
+EXECUTE FUNCTION associa_musico_com_banda();
+
+CREATE OR REPLACE FUNCTION associa_instrumento_com_estudio()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Verifica se o instrumento existe
+    IF NOT EXISTS (SELECT 1 FROM Instrumentos WHERE codigo = NEW.codigo_instrumento) THEN
+        RAISE EXCEPTION 'Instrumento com código % não existe', NEW.codigo_instrumento;
+    END IF;
+
+    -- Verifica se o estúdio existe
+    IF NOT EXISTS (SELECT 1 FROM Estudios WHERE codigo_estudio = NEW.codigo_estudio) THEN
+        RAISE EXCEPTION 'Estúdio com código % não existe', NEW.codigo_estudio;
+    END IF;
+
+	RAISE NOTICE 'Instrumento com código % foi associado ao estúdio com código %', NEW.codigo_instrumento, NEW.codigo_estudio;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_associa_instrumento_com_estudio
+AFTER INSERT ON Instrumentos
+FOR EACH ROW
+EXECUTE FUNCTION associa_instrumento_com_estudio();
+
+
+

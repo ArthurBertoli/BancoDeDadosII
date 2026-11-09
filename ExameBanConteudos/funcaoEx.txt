@@ -1,0 +1,209 @@
+--1)Função para inserção de um mecânico.
+CREATE OR REPLACE FUNCTION insere_mecanico(pcodm int, pcpf varchar, pnome varchar, pidade int, pendereco varchar, pcidade varchar, pfuncao varchar, pcods int)
+returns void AS
+$$
+	insert into mecanico values (pcodm, pcpf, pnome, pidade, pendereco, pcidade, pfuncao, pcods)
+$$
+language sql;
+
+select insere_mecanico (6, '11122233344', 'Rodrigo', 22, 'Itaum', 'Joinville', 'som', 1)
+
+select * from mecanico
+
+
+
+--2)Função para exclusão de um mecânico. 
+CREATE OR REPLACE FUNCTION remove_mecanico (pcodm int)
+returns int AS
+$$
+	declare
+		linhas int default 0;
+	BEGIN
+		delete from mecanico where codm = pcodm;
+		get diagnostics linhas = ROW_COUNT;
+		return linhas;
+	END;
+$$
+language plpgsql;
+select remove_mecanico (6)
+
+
+
+--3)Função única para inserção, atualizar e exclusão de um cliente.
+CREATE OR REPLACE FUNCTION atualiza_clientes (op varchar, pcodc int, pcpf varchar, pnome varchar, pidade int, pendereco varchar, pcidade varchar)
+returns void AS
+$$
+	BEGIN
+		if upper(op) = 'INSERT' then
+			insert into cliente values (pcodc, pcpf, pnome, pidade, pendereco, pcidade);
+		elseif upper(op) = 'UPDATE' then
+			update cliente set
+				cpf = pcfp,
+				nome = pnome,
+				idade = pidade,
+				endereco = pendereco,
+				cidade = pcidade
+			where
+				codc = pcodc;
+		elseif upper(op) = 'DELETE' then 
+			delete from cliente where codc = pcodc;
+		else
+			raise exception 'Comando inválido, apenas INSERT, UPDATE ou DELETE';
+		end if;
+		return;
+
+	END;
+$$
+language plpgsql;
+
+select atualiza_clientes ('insert', 8, '13377731423', 'Sidnei', 13, 'rua nao sei o que', 'Joinville');
+select atualiza_clientes ('update', 5, '51000110000', 'Carlos', 44, 'Centro', 'Florianópolis'); --Errada
+select atualiza_clientes ('delete', 1, null, null, null, null, null);
+
+select * from cliente
+
+
+
+--4)Função que limite o cadastro de no máximo 10 setores na oficina mecânica.
+CREATE OR REPLACE FUNCTION cadastra_setores(pcods int, pnome varchar)
+returns void AS
+$$
+declare
+	quant int default 0;
+	BEGIN
+		select count(*) into quant from setor;
+		if quant < 10 then
+			insert into setor values(pcods, pnome);
+		else
+			raise exception 'Limite de setores já atingido.';
+		end if;
+		return;
+	END;
+$$
+language plpgsql
+
+select cadastra_setores (6, 'Bancário');
+select cadastra_setores (7, 'Administrativo');
+select cadastra_setores (8, 'Operário');
+select cadastra_setores (9, 'Estético');
+select cadastra_setores (10, 'Maquinaria');
+select cadastra_setores (11, 'Cuidadoria');
+select * from setor
+
+
+
+--5)Função que limita o cadastro de um conserto apenas se o mecânico não tiver mais de 3 consertos agendados para o mesmo dia.
+CREATE OR REPLACE FUNCTION cadastro_consertos (pcodm int, pcodv int, pdata date, phora time)
+returns void AS
+$$
+declare
+	quantmec int default 0;
+	BEGIN
+		select count(*) from conserto group by codm, data into quantmec;
+		raise notice 'Valor de quant: %', quantmec;
+		
+		if quantmec < 3 then
+			 insert into conserto values (pcodm, pcodv, pdata, phora);
+		else 
+			raise exception 'Quantidade máxima de consertos já atingida.';
+		end if;
+		return;
+	END;
+$$
+language plpgsql;
+
+
+select cadastra_consertos (1, 2, '2014-')
+
+select * from mecanico
+select * from conserto
+
+
+
+--6)Função para calcular a média geral de idade dos Mecânicos e Clientes.
+CREATE OR REPLACE FUNCTION media() returns float as
+$$
+declare 
+	soma float default 0;
+	v_idade float default 0;
+	quant float default 0;
+BEGIN
+	for v_idade in select idade from mecanico where idade is not null loop
+		soma := soma + v_idade;
+		quant := quant + 1;
+	end loop;
+	for v_idade in select idade from cliente where idade is not null loop
+		soma := soma + v_idade;
+		quant := quant + 1;
+	end loop;
+	return ROUND ((soma / quant)::numeric, 2 );
+END;
+$$
+language plpgsql;
+
+select media();
+
+drop function media
+
+select * from mecanico;
+select * from cliente;
+select * from setor;
+select * from veiculo;
+
+
+
+--7)Função única que permita fazer a exclusão de um Setor, Mecânico, Cliente ou Veículo.
+CREATE OR REPLACE FUNCTION exclusao(tabela varchar, id varchar, valor int) returns int as
+$$
+declare
+	sql varchar;
+	linhas_afetadas int;
+BEGIN
+	sql := 'delete from ' ||tabela|| ' where '||id||' = '||valor;
+	raise notice 'SQL = %', sql;
+	execute sql;
+	get diagnostics linhas_afetadas = ROW_COUNT;
+	return linhas_afetadas;
+END;
+$$
+language plpgsql;
+select exclusao ('setor', 'cods', 1);
+
+
+
+--8)Considerando que na tabela Cliente apenas codc é a chave primária, faça uma função que remova clientes com CPF repetido, 
+--deixando apenas um cadastro para cada CPF. Escolha o critério que preferir para definir qual cadastro será mantido: aquele com a menor idade,
+--que possuir mais consertos agendados, etc. Para testar a função, não se esqueça de inserir na tabela alguns clientes com este problema.
+CREATE OR REPLACE FUNCTION exclui_cpf() returns int as 
+$$
+declare
+	vcodc int;
+	vcpf char(11): totalLinhas int := 0;
+	cont int := 0; linhas int := 0;
+BEGIN
+	for vcpf in select cpf from cliente group by cpf having count(*)>1 loop
+	cont := 0;
+		for vcodc from cliente c where c.cpf =vcpf
+			if cont > 0 then
+			delete from cliente cli where cli.codc = v.codc;
+			get diagnostics linhas = row_count;
+			totalLinhas := totalLinhas + linhas;
+			end if;
+			cont := cont + 1;
+		end loop;
+	end loop;
+	return totalLinhas;
+END;
+$$
+language plpgsql;
+
+	
+
+--9)Função para calcular se o CPF é válido*.
+
+
+
+--10)Função que calcula a quantidade de horas extras de um mecânico em um mês de trabalho. 
+--O número de horas extras é calculado a partir das horas que excedam as 160 horas de trabalho mensais. 
+--O número de horas mensais trabalhadas é calculada a partir dos consertos realizados. Cada conserto tem a duração de 1 hora.
+
